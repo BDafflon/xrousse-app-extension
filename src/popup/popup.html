@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Reco Croix-Rousse</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <h1>Reco Croix-Rousse</h1>
+
+  <section id="login-panel" hidden>
+    <form id="login-form">
+      <label>
+        URL de l'API
+        <input type="text" id="api-base-url" placeholder="http://localhost:8000" />
+      </label>
+      <label>
+        Email
+        <input type="email" id="login-email" required />
+      </label>
+      <label>
+        Mot de passe
+        <input type="password" id="login-password" required />
+      </label>
+      <button type="submit">Se connecter</button>
+      <p class="error" id="login-error" hidden></p>
+    </form>
+  </section>
+
+  <section id="draft-panel" hidden>
+    <p class="draft-info">
+      Brouillon courant : <strong id="draft-title">(aucun titre)</strong><br />
+      <span id="draft-source"></span>
+    </p>
+    <div class="actions">
+      <button type="button" id="action-new-draft">Créer un nouveau brouillon</button>
+      <button type="button" id="action-copy-title">Copier la sélection comme titre</button>
+      <button type="button" id="action-append-description">Append la sélection à la description</button>
+      <button type="button" id="action-set-source">Capturer cette page comme source</button>
+    </div>
+    <p class="error" id="draft-error" hidden></p>
+    <button type="button" id="action-logout">Se déconnecter</button>
+  </section>
+
+  <script src="../../vendor/browser-polyfill.js"></script>
+  <script src="../storage.js"></script>
+  <script src="../api.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
