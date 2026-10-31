@@ -66,8 +66,14 @@ async function authedFetch(path, options = {}) {
     const newTokens = await refresh(refreshToken);
     await Storage.setTokens(newTokens);
     return buildRequest(path, options, newTokens.access_token);
-  } catch {
-    await Storage.clearTokens();
+  } catch (error) {
+    // Only an explicit rejection from the refresh endpoint itself (an
+    // invalid/expired refresh token) means the session is actually over.
+    // A network error (fetch throwing a bare TypeError, e.g. the backend is
+    // briefly unreachable) is transient and must not log the user out.
+    if (error instanceof ApiError) {
+      await Storage.clearTokens();
+    }
     return response;
   }
 }

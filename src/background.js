@@ -1,11 +1,20 @@
-importScripts('../vendor/browser-polyfill.js', 'storage.js', 'api.js');
+// Chrome (MV3 service worker) loads storage.js/api.js via importScripts here.
+// Firefox (MV3 background event page, no importScripts) loads them instead
+// via manifest.json's background.scripts array, before this file.
+if (typeof importScripts === 'function') {
+  importScripts('../vendor/browser-polyfill.js', 'storage.js', 'api.js');
+}
 
 const MENU_CREATE_DRAFT = 'rcx-create-draft';
 const MENU_COPY_AS_TITLE = 'rcx-copy-as-title';
 const MENU_APPEND_DESCRIPTION = 'rcx-append-description';
 const MENU_SET_SOURCE = 'rcx-set-source';
 
-function registerContextMenus() {
+async function registerContextMenus() {
+  // Service workers (Chrome) and event pages (Firefox) can both restart and
+  // re-run this top-level registration; clear first so re-registering the
+  // same ids doesn't log "duplicate id" errors.
+  await browser.contextMenus.removeAll();
   browser.contextMenus.create({
     id: MENU_CREATE_DRAFT,
     title: 'Ajouter cet événement',
@@ -28,18 +37,7 @@ function registerContextMenus() {
   });
 }
 
-browser.runtime.onInstalled.addListener(registerContextMenus);
 registerContextMenus();
-
-async function ensureCurrentDraftId(tab) {
-  const existing = await Storage.getCurrentDraftId();
-  if (existing !== null) {
-    return existing;
-  }
-  const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
-  await Storage.setCurrentDraftId(draft.id);
-  return draft.id;
-}
 
 function notify(title, message) {
   browser.notifications.create({
@@ -50,28 +48,71 @@ function notify(title, message) {
   });
 }
 
+// A current-draft id that 404s (deleted) or 409s (published, no longer a
+// draft) can never succeed again until the stale reference is cleared — the
+// caller should create a fresh draft and retry once.
+function isStaleDraftError(error) {
+  return error instanceof ApiError && (error.status === 404 || error.status === 409);
+}
+
+async function ensureCurrentDraft(tab) {
+  const existing = await Storage.getCurrentDraft();
+  if (existing !== null) {
+    return existing;
+  }
+  const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
+  await Storage.setCurrentDraft(draft);
+  return draft;
+}
+
+async function withStaleDraftRecovery(tab, action) {
+  const draft = await ensureCurrentDraft(tab);
+  try {
+    return await action(draft.id);
+  } catch (error) {
+    if (!isStaleDraftError(error)) {
+      throw error;
+    }
+    await Storage.clearCurrentDraft();
+    const freshDraft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
+    await Storage.setCurrentDraft(freshDraft);
+    return action(freshDraft.id);
+  }
+}
+
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
     if (info.menuItemId === MENU_CREATE_DRAFT) {
       const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: info.selectionText });
-      await Storage.setCurrentDraftId(draft.id);
-      notify('Reco Croix-Rousse', 'Brouillon créé.');
+      await Storage.setCurrentDraft(draft);
+      if (draft.statut !== 'brouillon') {
+        notify('Reco Croix-Rousse', 'Cette page est déjà associée à un événement publié — impossible de le modifier ici.');
+      } else if (draft.titre !== info.selectionText) {
+        notify('Reco Croix-Rousse', 'Un brouillon existait déjà pour cette page ; il est repris sans changer son titre.');
+      } else {
+        notify('Reco Croix-Rousse', 'Brouillon créé.');
+      }
       return;
     }
 
-    const draftId = await ensureCurrentDraftId(tab);
-
     if (info.menuItemId === MENU_COPY_AS_TITLE) {
-      await Api.patchDraftTitle(draftId, info.selectionText);
+      const updated = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftTitle(draftId, info.selectionText));
+      await Storage.setCurrentDraft(updated);
       notify('Reco Croix-Rousse', 'Titre mis à jour.');
     } else if (info.menuItemId === MENU_APPEND_DESCRIPTION) {
-      await Api.appendDraftDescription(draftId, info.selectionText);
+      const updated = await withStaleDraftRecovery(tab, (draftId) => Api.appendDraftDescription(draftId, info.selectionText));
+      await Storage.setCurrentDraft(updated);
       notify('Reco Croix-Rousse', 'Description mise à jour.');
     } else if (info.menuItemId === MENU_SET_SOURCE) {
-      await Api.patchDraftSource(draftId, tab.url);
+      const updated = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftSource(draftId, tab.url));
+      await Storage.setCurrentDraft(updated);
       notify('Reco Croix-Rousse', 'Source mise à jour.');
     }
   } catch (error) {
-    notify('Reco Croix-Rousse — erreur', error.message || String(error));
+    if (error instanceof ApiError && error.status === 401) {
+      notify('Reco Croix-Rousse — session expirée', 'Reconnectez-vous via le popup de l\'extension.');
+    } else {
+      notify('Reco Croix-Rousse — erreur', error.message || String(error));
+    }
   }
 });

@@ -30,22 +30,22 @@ défaut `http://localhost:8000`. Elle est stockée localement
 
 ## CORS côté backend
 
-Le backend n'acceptera les appels de l'extension que si son origine
-(`chrome-extension://...` ou `moz-extension://...`) figure dans la variable
-d'environnement `CORS_ORIGINS` du backend (voir
-`backend/.env.example`). L'extension utilise une clé publique et un id
-Firefox fixes (`manifest.json`) pour que ces origines restent stables d'un
-rechargement à l'autre :
+Le backend n'acceptera les appels de l'extension que si son origine est
+autorisée :
 
-- Chrome : l'id dérivé de la clé fixe dans `manifest.json` est
-  `bahglccliddlmejchlpnibhpkdkhabek` → origine
-  `chrome-extension://bahglccliddlmejchlpnibhpkdkhabek`.
-- Firefox : `browser_specific_settings.gecko.id` est
-  `reco-croixrousse@dafflon.fr` → origine
-  `moz-extension://reco-croixrousse@dafflon.fr`.
+- Chrome : origine stable, dérivée de la clé publique fixe dans
+  `manifest.json` → `chrome-extension://bahglccliddlmejchlpnibhpkdkhabek`.
+  Cette origine doit figurer explicitement dans `CORS_ORIGINS` (voir
+  `backend/.env.example`).
+- Firefox : l'origine `moz-extension://<uuid>` est un UUID aléatoire par
+  installation (le `gecko.id` fixé dans `manifest.json` n'influence pas cet
+  UUID), donc elle ne peut pas être listée à l'avance dans `CORS_ORIGINS`.
+  Le backend autorise tout le schéma `moz-extension://` via
+  `allow_origin_regex` (`backend/app/main.py`), en plus de la liste exacte
+  `CORS_ORIGINS` utilisée pour les autres origines (frontend, Chrome).
 
-Ajouter ces deux origines à `CORS_ORIGINS` dans `backend/.env`, puis
-redémarrer le serveur backend.
+Ajouter l'origine Chrome ci-dessus à `CORS_ORIGINS` dans `backend/.env`,
+puis redémarrer le serveur backend.
 
 ## Authentification
 

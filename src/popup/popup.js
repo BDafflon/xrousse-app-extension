@@ -31,9 +31,10 @@ function clearDraftError() {
   draftError.hidden = true;
 }
 
-function updateDraftDisplay({ titre, source_url }) {
-  draftTitleEl.textContent = titre || '(aucun titre)';
-  draftSourceEl.textContent = source_url || '';
+function updateDraftDisplay(draft) {
+  const label = draft.titre || '(aucun titre)';
+  draftTitleEl.textContent = draft.id ? `#${draft.id} — ${label}` : label;
+  draftSourceEl.textContent = draft.source_url || '';
 }
 
 async function getActiveTab() {
@@ -49,13 +50,61 @@ async function getSelectedText(tabId) {
   return results[0]?.result ?? '';
 }
 
+function isStaleDraftError(error) {
+  return error instanceof ApiError && (error.status === 404 || error.status === 409);
+}
+
+async function ensureDraftId(tab) {
+  const existing = await Storage.getCurrentDraft();
+  if (existing !== null) {
+    return existing.id;
+  }
+  const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
+  await Storage.setCurrentDraft(draft);
+  updateDraftDisplay(draft);
+  return draft.id;
+}
+
+async function withStaleDraftRecovery(tab, action) {
+  const draftId = await ensureDraftId(tab);
+  try {
+    return await action(draftId);
+  } catch (error) {
+    if (!isStaleDraftError(error)) {
+      throw error;
+    }
+    await Storage.clearCurrentDraft();
+    const freshDraft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
+    await Storage.setCurrentDraft(freshDraft);
+    return action(freshDraft.id);
+  }
+}
+
+async function runDraftAction(action) {
+  clearDraftError();
+  try {
+    const tab = await getActiveTab();
+    await action(tab);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      showLoginPanel();
+      return;
+    }
+    showDraftError(error.message || String(error));
+  }
+}
+
 async function init() {
   apiBaseUrlInput.value = await Storage.getApiBaseUrl();
   const { accessToken } = await Storage.getTokens();
-  if (accessToken) {
-    showDraftPanel();
-  } else {
+  if (!accessToken) {
     showLoginPanel();
+    return;
+  }
+  showDraftPanel();
+  const current = await Storage.getCurrentDraft();
+  if (current) {
+    updateDraftDisplay(current);
   }
 }
 
@@ -71,6 +120,10 @@ loginForm.addEventListener('submit', async (event) => {
     const tokens = await Api.login(email, password);
     await Storage.setTokens(tokens);
     showDraftPanel();
+    const current = await Storage.getCurrentDraft();
+    if (current) {
+      updateDraftDisplay(current);
+    }
   } catch (error) {
     showLoginError(error.message || String(error));
   }
@@ -81,70 +134,39 @@ document.getElementById('action-logout').addEventListener('click', async () => {
   showLoginPanel();
 });
 
-document.getElementById('action-new-draft').addEventListener('click', async () => {
-  clearDraftError();
-  try {
-    const tab = await getActiveTab();
-    const selectionText = await getSelectedText(tab.id);
-    const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: selectionText || null });
-    await Storage.setCurrentDraftId(draft.id);
-    updateDraftDisplay(draft);
-  } catch (error) {
-    showDraftError(error.message || String(error));
-  }
-});
+document.getElementById('action-new-draft').addEventListener('click', () => runDraftAction(async (tab) => {
+  const selectionText = await getSelectedText(tab.id);
+  const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: selectionText || null });
+  await Storage.setCurrentDraft(draft);
+  updateDraftDisplay(draft);
+}));
 
-document.getElementById('action-copy-title').addEventListener('click', async () => {
-  clearDraftError();
-  try {
-    const tab = await getActiveTab();
-    const selectionText = await getSelectedText(tab.id);
-    let draftId = await Storage.getCurrentDraftId();
-    if (draftId === null) {
-      const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
-      draftId = draft.id;
-      await Storage.setCurrentDraftId(draftId);
-    }
-    const draft = await Api.patchDraftTitle(draftId, selectionText);
-    updateDraftDisplay(draft);
-  } catch (error) {
-    showDraftError(error.message || String(error));
+document.getElementById('action-copy-title').addEventListener('click', () => runDraftAction(async (tab) => {
+  const selectionText = await getSelectedText(tab.id);
+  if (!selectionText) {
+    showDraftError('Aucune sélection sur la page.');
+    return;
   }
-});
+  const draft = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftTitle(draftId, selectionText));
+  await Storage.setCurrentDraft(draft);
+  updateDraftDisplay(draft);
+}));
 
-document.getElementById('action-append-description').addEventListener('click', async () => {
-  clearDraftError();
-  try {
-    const tab = await getActiveTab();
-    const selectionText = await getSelectedText(tab.id);
-    let draftId = await Storage.getCurrentDraftId();
-    if (draftId === null) {
-      const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
-      draftId = draft.id;
-      await Storage.setCurrentDraftId(draftId);
-    }
-    const draft = await Api.appendDraftDescription(draftId, selectionText);
-    updateDraftDisplay(draft);
-  } catch (error) {
-    showDraftError(error.message || String(error));
+document.getElementById('action-append-description').addEventListener('click', () => runDraftAction(async (tab) => {
+  const selectionText = await getSelectedText(tab.id);
+  if (!selectionText) {
+    showDraftError('Aucune sélection sur la page.');
+    return;
   }
-});
+  const draft = await withStaleDraftRecovery(tab, (draftId) => Api.appendDraftDescription(draftId, selectionText));
+  await Storage.setCurrentDraft(draft);
+  updateDraftDisplay(draft);
+}));
 
-document.getElementById('action-set-source').addEventListener('click', async () => {
-  clearDraftError();
-  try {
-    const tab = await getActiveTab();
-    let draftId = await Storage.getCurrentDraftId();
-    if (draftId === null) {
-      const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: null });
-      draftId = draft.id;
-      await Storage.setCurrentDraftId(draftId);
-    }
-    const draft = await Api.patchDraftSource(draftId, tab.url);
-    updateDraftDisplay(draft);
-  } catch (error) {
-    showDraftError(error.message || String(error));
-  }
-});
+document.getElementById('action-set-source').addEventListener('click', () => runDraftAction(async (tab) => {
+  const draft = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftSource(draftId, tab.url));
+  await Storage.setCurrentDraft(draft);
+  updateDraftDisplay(draft);
+}));
 
 init();

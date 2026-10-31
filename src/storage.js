@@ -4,7 +4,7 @@ const KEYS = {
   accessToken: 'accessToken',
   refreshToken: 'refreshToken',
   apiBaseUrl: 'apiBaseUrl',
-  currentDraftId: 'currentDraftId',
+  currentDraft: 'currentDraft',
 };
 
 async function getTokens() {
@@ -15,10 +15,10 @@ async function getTokens() {
   };
 }
 
-async function setTokens({ accessToken, refreshToken }) {
+async function setTokens({ access_token, refresh_token }) {
   await browser.storage.local.set({
-    [KEYS.accessToken]: accessToken,
-    [KEYS.refreshToken]: refreshToken,
+    [KEYS.accessToken]: access_token,
+    [KEYS.refreshToken]: refresh_token,
   });
 }
 
@@ -35,17 +35,17 @@ async function setApiBaseUrl(url) {
   await browser.storage.local.set({ [KEYS.apiBaseUrl]: url });
 }
 
-async function getCurrentDraftId() {
-  const stored = await browser.storage.local.get(KEYS.currentDraftId);
-  return stored[KEYS.currentDraftId] ?? null;
+async function getCurrentDraft() {
+  const stored = await browser.storage.local.get(KEYS.currentDraft);
+  return stored[KEYS.currentDraft] ?? null;
 }
 
-async function setCurrentDraftId(id) {
-  await browser.storage.local.set({ [KEYS.currentDraftId]: id });
+async function setCurrentDraft({ id, titre, source_url, statut }) {
+  await browser.storage.local.set({ [KEYS.currentDraft]: { id, titre, source_url, statut } });
 }
 
-async function clearCurrentDraftId() {
-  await browser.storage.local.remove(KEYS.currentDraftId);
+async function clearCurrentDraft() {
+  await browser.storage.local.remove(KEYS.currentDraft);
 }
 
 const Storage = {
@@ -54,7 +54,7 @@ const Storage = {
   clearTokens,
   getApiBaseUrl,
   setApiBaseUrl,
-  getCurrentDraftId,
-  setCurrentDraftId,
-  clearCurrentDraftId,
+  getCurrentDraft,
+  setCurrentDraft,
+  clearCurrentDraft,
 };
