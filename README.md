@@ -56,3 +56,47 @@ essai de refresh est fait au moment d'un appel qui échoue en 401 ; si cet
 essai échoue aussi (refresh token expiré, par défaut après
 `JWT_REFRESH_EXPIRE_DAYS` = 30 jours), les tokens sont effacés et le popup
 revient sur l'écran de connexion au prochain ouverture.
+
+## Publication sur addons.mozilla.org (AMO)
+
+1. Créer un compte développeur sur
+   [addons.mozilla.org/developers](https://addons.mozilla.org/developers/).
+2. Préparer le zip de l'extension : à la racine du dossier `extension/`
+   (pas un sous-dossier), zipper uniquement les fichiers nécessaires au
+   runtime (exclure `.git/`, `.superpowers/`, et tout fichier de dev) :
+   ```
+   cd extension
+   zip -r ../reco-croixrousse-firefox.zip . \
+     -x ".git/*" ".superpowers/*" ".gitignore"
+   ```
+3. Sur AMO, "Soumettre un nouveau module" → choisir "On this site"
+   (listing public) ou "On your own" (auto-distribution, pas de review
+   publique mais signature quand même requise) selon l'usage visé.
+4. Uploader le zip. AMO lance une validation automatique (lint du
+   manifest, permissions, code). Pour une extension qui n'est pas destinée
+   au grand public (usage interne équipe), choisir "Unlisted" évite la
+   review manuelle complète tout en obtenant une version signée
+   installable de façon permanente.
+5. Renseigner la fiche (description longue, catégorie, captures d'écran)
+   si listing public ; sinon ces champs sont optionnels pour "Unlisted".
+6. Vérifier avant soumission :
+   - `version` dans `manifest.json` doit être incrémentée à chaque upload
+     (AMO refuse une version déjà utilisée).
+   - `browser_specific_settings.gecko.id` doit rester stable entre les
+     versions (c'est l'identifiant qui lie les mises à jour entre elles).
+   - Les permissions demandées (`storage`, `contextMenus`, `activeTab`,
+     `notifications`, `scripting`, `windows`) doivent être cohérentes avec
+     ce que fait réellement le code : AMO peut demander une justification
+     en review manuelle si une permission semble large par rapport à
+     l'usage (`scripting` notamment attire souvent une question).
+   - Le champ `data_collection_permissions` est déjà renseigné à `none`
+     dans `manifest.json` ; il doit refléter la réalité (l'extension ne
+     doit alors faire aucun appel vers un service tiers autre que l'API
+     backend configurée par l'utilisateur).
+7. Une fois approuvée, AMO fournit un `.xpi` signé. C'est ce fichier
+   (et non le zip source) qui doit être distribué pour une installation
+   permanente — Firefox refuse les extensions non signées en dehors du
+   mode développeur/Nightly.
+8. Pour les mises à jour futures : incrémenter `version`, régénérer le
+   zip, et soumettre une nouvelle version sur la même fiche AMO (pas un
+   nouveau listing).

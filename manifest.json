@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Reco Croix-Rousse",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Capturez rapidement un événement vu sur le web vers un brouillon Reco Croix-Rousse.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyqyOO/WjaakXhQFbSOAKMnjDc8fUhK8m+A1QrYURSX3jhG1dCzxiT9vtRiq0XkhjxhSPZ01LjdqqQu4zGs8jCyHlTi5jKcXt3N3W8ro06mKWibYNDGgsCHFNLEf/fj3/yeb/qXQLRS0M+TODD0XBLUkD1c6WTh+fCxQFdf03V7vdiID8y6PqPUK+VZ61r5L57u4eNh64tsmWktEe9AiFGfGqPaEysPqKq3mHCqLOYfx5h4dJySRZgE0TLhNz4p+JiisYDXo0y3SyGFDAcgE8Yo35kCj6bu2CoXkLMElYrain7e8PrkqAvVGEBVaPlq2SLT9GV72muM3ktqba+bk7wwIDAQAB",
   "browser_specific_settings": {
