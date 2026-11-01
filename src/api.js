@@ -129,6 +129,20 @@ async function patchDraftImage(draftId, imageUrl) {
   });
 }
 
+async function patchDraftDate(draftId, date) {
+  return authedJson(`/drafts/${draftId}/date`, {
+    method: 'PATCH',
+    body: JSON.stringify({ date }),
+  });
+}
+
+async function patchDraftDateFin(draftId, dateFin) {
+  return authedJson(`/drafts/${draftId}/date-fin`, {
+    method: 'PATCH',
+    body: JSON.stringify({ date_fin: dateFin }),
+  });
+}
+
 async function uploadImage(blob) {
   const formData = new FormData();
   formData.append('file', blob);
@@ -150,5 +164,7 @@ const Api = {
   appendDraftDescription,
   patchDraftSource,
   patchDraftImage,
+  patchDraftDate,
+  patchDraftDateFin,
   uploadImage,
 };

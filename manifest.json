@@ -13,10 +13,10 @@
       "strict_min_version": "121.0"
     }
   },
-  "permissions": ["storage", "contextMenus", "activeTab", "notifications", "scripting"],
+  "permissions": ["storage", "contextMenus", "activeTab", "notifications", "scripting", "windows"],
   "background": {
     "service_worker": "src/background.js",
-    "scripts": ["vendor/browser-polyfill.js", "src/storage.js", "src/api.js", "src/background.js"]
+    "scripts": ["vendor/browser-polyfill.js", "src/storage.js", "src/api.js", "src/dateParser.js", "src/background.js"]
   },
   "action": {
     "default_popup": "src/popup/popup.html",

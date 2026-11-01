@@ -1,0 +1,41 @@
+body {
+  width: 320px;
+  font-family: system-ui, sans-serif;
+  padding: 12px;
+  margin: 0;
+}
+
+h1 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+
+.selection-text {
+  font-size: 13px;
+  margin-bottom: 12px;
+  word-break: break-word;
+}
+
+label {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
+  padding: 4px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.actions button {
+  flex: 1;
+  padding: 6px;
+}

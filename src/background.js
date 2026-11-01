@@ -2,7 +2,7 @@
 // Firefox (MV3 background event page, no importScripts) loads them instead
 // via manifest.json's background.scripts array, before this file.
 if (typeof importScripts === 'function') {
-  importScripts('../vendor/browser-polyfill.js', 'storage.js', 'api.js');
+  importScripts('../vendor/browser-polyfill.js', 'storage.js', 'api.js', 'dateParser.js');
 }
 
 const MENU_CREATE_DRAFT = 'rcx-create-draft';
@@ -10,6 +10,8 @@ const MENU_COPY_AS_TITLE = 'rcx-copy-as-title';
 const MENU_APPEND_DESCRIPTION = 'rcx-append-description';
 const MENU_SET_SOURCE = 'rcx-set-source';
 const MENU_SET_IMAGE = 'rcx-set-image';
+const MENU_SET_DATE = 'rcx-set-date';
+const MENU_SET_DATE_FIN = 'rcx-set-date-fin';
 
 async function registerContextMenus() {
   // Service workers (Chrome) and event pages (Firefox) can both restart and
@@ -40,6 +42,16 @@ async function registerContextMenus() {
     id: MENU_SET_IMAGE,
     title: 'Utiliser cette image',
     contexts: ['image'],
+  });
+  browser.contextMenus.create({
+    id: MENU_SET_DATE,
+    title: 'Utiliser la sélection comme date',
+    contexts: ['selection'],
+  });
+  browser.contextMenus.create({
+    id: MENU_SET_DATE_FIN,
+    title: 'Utiliser la sélection comme date de fin',
+    contexts: ['selection'],
   });
 }
 
@@ -88,6 +100,59 @@ async function withStaleDraftRecovery(tab, action) {
 
 class ImageFetchError extends Error {}
 
+async function applyDateToField(tab, field, isoDate) {
+  const updated = await withStaleDraftRecovery(
+    tab,
+    (draftId) => (field === 'date' ? Api.patchDraftDate(draftId, isoDate) : Api.patchDraftDateFin(draftId, isoDate)),
+  );
+  await Storage.setCurrentDraft(updated);
+  notify('Reco Croix-Rousse', field === 'date' ? 'Date mise à jour.' : 'Date de fin mise à jour.');
+}
+
+async function openDateConfirmWindow(field, selectionText) {
+  const url = browser.runtime.getURL(
+    `src/confirm-date/confirm-date.html?field=${encodeURIComponent(field)}&selectionText=${encodeURIComponent(selectionText || '')}`,
+  );
+  await browser.windows.create({ url, type: 'popup', width: 360, height: 260 });
+}
+
+async function handleDateSelection(tab, field, selectionText) {
+  const isoDate = parseDateString(selectionText || '');
+  if (isoDate !== null) {
+    await applyDateToField(tab, field, isoDate);
+    return;
+  }
+  // Parsing failed: remember which tab/draft this confirmation is for, then
+  // let the user pick the date in a small popup window. The actual PATCH
+  // happens in the 'rcx-date-confirmed' runtime.onMessage listener below,
+  // once that window reports back what the user chose (or closes without
+  // submitting, in which case nothing happens).
+  pendingDateConfirmTab = tab;
+  await openDateConfirmWindow(field, selectionText);
+}
+
+// Set right before opening the confirm-date popup window and read by the
+// 'rcx-date-confirmed' message handler below. A single module-level slot is
+// enough because only one confirm-date window can be meaningfully open at a
+// time from the user's perspective (each context-menu click opens a new
+// one), and MV3 background pages are event-driven / effectively
+// single-flow between a menu click and the resulting message.
+let pendingDateConfirmTab = null;
+
+browser.runtime.onMessage.addListener((message) => {
+  if (message?.type !== 'rcx-date-confirmed') return;
+  const tab = pendingDateConfirmTab;
+  pendingDateConfirmTab = null;
+  if (!tab) return;
+  applyDateToField(tab, message.field, message.isoDate).catch((error) => {
+    if (error instanceof ApiError && error.status === 401) {
+      notify('Reco Croix-Rousse — session expirée', 'Reconnectez-vous via le popup de l\'extension.');
+    } else {
+      notify('Reco Croix-Rousse — erreur', error.message || String(error));
+    }
+  });
+});
+
 async function fetchImageBlob(srcUrl) {
   let response;
   try {
@@ -134,6 +199,10 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
       const updated = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftImage(draftId, url));
       await Storage.setCurrentDraft(updated);
       notify('Reco Croix-Rousse', 'Image mise à jour.');
+    } else if (info.menuItemId === MENU_SET_DATE) {
+      await handleDateSelection(tab, 'date', info.selectionText);
+    } else if (info.menuItemId === MENU_SET_DATE_FIN) {
+      await handleDateSelection(tab, 'date-fin', info.selectionText);
     }
   } catch (error) {
     if (error instanceof ImageFetchError) {

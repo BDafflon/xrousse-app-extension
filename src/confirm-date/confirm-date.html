@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Reco Croix-Rousse — Confirmer la date</title>
+  <link rel="stylesheet" href="confirm-date.css" />
+</head>
+<body>
+  <h1>Date non reconnue</h1>
+  <p class="selection-text">
+    Texte sélectionné : <strong id="selection-text"></strong>
+  </p>
+  <form id="confirm-form">
+    <label>
+      Date et heure
+      <input type="datetime-local" id="date-input" required />
+    </label>
+    <div class="actions">
+      <button type="button" id="action-cancel">Annuler</button>
+      <button type="submit" id="action-confirm">Valider</button>
+    </div>
+  </form>
+
+  <script src="../../vendor/browser-polyfill.js"></script>
+  <script src="confirm-date.js"></script>
+</body>
+</html>
