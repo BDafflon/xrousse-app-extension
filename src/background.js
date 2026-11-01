@@ -9,6 +9,7 @@ const MENU_CREATE_DRAFT = 'rcx-create-draft';
 const MENU_COPY_AS_TITLE = 'rcx-copy-as-title';
 const MENU_APPEND_DESCRIPTION = 'rcx-append-description';
 const MENU_SET_SOURCE = 'rcx-set-source';
+const MENU_SET_IMAGE = 'rcx-set-image';
 
 async function registerContextMenus() {
   // Service workers (Chrome) and event pages (Firefox) can both restart and
@@ -34,6 +35,11 @@ async function registerContextMenus() {
     id: MENU_SET_SOURCE,
     title: 'Source : capturer cette page',
     contexts: ['page'],
+  });
+  browser.contextMenus.create({
+    id: MENU_SET_IMAGE,
+    title: 'Utiliser cette image',
+    contexts: ['image'],
   });
 }
 
@@ -80,6 +86,21 @@ async function withStaleDraftRecovery(tab, action) {
   }
 }
 
+class ImageFetchError extends Error {}
+
+async function fetchImageBlob(srcUrl) {
+  let response;
+  try {
+    response = await fetch(srcUrl);
+  } catch (error) {
+    throw new ImageFetchError(`Impossible de récupérer l'image : ${error.message || error}`);
+  }
+  if (!response.ok) {
+    throw new ImageFetchError(`Impossible de récupérer l'image (statut ${response.status}).`);
+  }
+  return response.blob();
+}
+
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
   try {
     if (info.menuItemId === MENU_CREATE_DRAFT) {
@@ -107,9 +128,17 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
       const updated = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftSource(draftId, tab.url));
       await Storage.setCurrentDraft(updated);
       notify('Reco Croix-Rousse', 'Source mise à jour.');
+    } else if (info.menuItemId === MENU_SET_IMAGE) {
+      const blob = await fetchImageBlob(info.srcUrl);
+      const { url } = await Api.uploadImage(blob);
+      const updated = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftImage(draftId, url));
+      await Storage.setCurrentDraft(updated);
+      notify('Reco Croix-Rousse', 'Image mise à jour.');
     }
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
+    if (error instanceof ImageFetchError) {
+      notify('Reco Croix-Rousse — erreur', error.message);
+    } else if (error instanceof ApiError && error.status === 401) {
       notify('Reco Croix-Rousse — session expirée', 'Reconnectez-vous via le popup de l\'extension.');
     } else {
       notify('Reco Croix-Rousse — erreur', error.message || String(error));

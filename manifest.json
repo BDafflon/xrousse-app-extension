@@ -7,6 +7,9 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "reco-croixrousse@dafflon.fr",
+      "data_collection_permissions": {
+      "required": ["none"]
+    },
       "strict_min_version": "121.0"
     }
   },

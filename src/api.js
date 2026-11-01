@@ -42,7 +42,11 @@ async function refresh(refreshToken) {
 async function buildRequest(path, options, accessToken) {
   const baseUrl = await Storage.getApiBaseUrl();
   const headers = new Headers(options.headers || {});
-  headers.set('Content-Type', 'application/json');
+  // FormData bodies (image upload) must NOT get a Content-Type here: fetch
+  // needs to set its own multipart/form-data value with the boundary.
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (accessToken) {
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
@@ -118,6 +122,26 @@ async function patchDraftSource(draftId, sourceUrl) {
   });
 }
 
+async function patchDraftImage(draftId, imageUrl) {
+  return authedJson(`/drafts/${draftId}/image`, {
+    method: 'PATCH',
+    body: JSON.stringify({ image_url: imageUrl }),
+  });
+}
+
+async function uploadImage(blob) {
+  const formData = new FormData();
+  formData.append('file', blob);
+  const response = await authedFetch('/backoffice/uploads', {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, await parseErrorMessage(response));
+  }
+  return response.json();
+}
+
 const Api = {
   login,
   authedFetch,
@@ -125,4 +149,6 @@ const Api = {
   patchDraftTitle,
   appendDraftDescription,
   patchDraftSource,
+  patchDraftImage,
+  uploadImage,
 };
