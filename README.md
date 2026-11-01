@@ -89,6 +89,10 @@ revient sur l'écran de connexion au prochain ouverture.
      ce que fait réellement le code : AMO peut demander une justification
      en review manuelle si une permission semble large par rapport à
      l'usage (`scripting` notamment attire souvent une question).
+   - `host_permissions: ["<all_urls>"]` est nécessaire pour l'action
+     "Utiliser cette image" : le background télécharge l'image depuis
+     n'importe quel site, ce qu'un `fetch` cross-origin sans host
+     permission bloque via CORS. À justifier en review AMO.
    - Le champ `data_collection_permissions` est déjà renseigné à `none`
      dans `manifest.json` ; il doit refléter la réalité (l'extension ne
      doit alors faire aucun appel vers un service tiers autre que l'API

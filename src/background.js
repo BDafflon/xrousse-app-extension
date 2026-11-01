@@ -153,6 +153,23 @@ browser.runtime.onMessage.addListener((message) => {
   });
 });
 
+// Firefox MV3 does not grant host_permissions at install: without them the
+// cross-origin image fetch below is blocked by CORS. permissions.request()
+// must run synchronously inside the context-menu click (user gesture), so
+// this is called first, before any other await.
+async function ensureImageHostAccess() {
+  const origins = ['<all_urls>'];
+  // request() resolves true right away if already granted, and must be the
+  // first call in the click handler to keep the user-gesture context.
+  const granted = await browser.permissions.request({ origins });
+  console.log('[rcx] host access granted:', granted);
+  if (!granted) {
+    throw new ImageFetchError(
+      "Accès aux sites refusé : activez-le dans about:addons > l'extension > Autorisations.",
+    );
+  }
+}
+
 async function fetchImageBlob(srcUrl) {
   let response;
   try {
@@ -167,6 +184,7 @@ async function fetchImageBlob(srcUrl) {
 }
 
 browser.contextMenus.onClicked.addListener(async (info, tab) => {
+  console.log('[rcx] menu clicked:', info.menuItemId, info.srcUrl);
   try {
     if (info.menuItemId === MENU_CREATE_DRAFT) {
       const draft = await Api.upsertDraft({ sourceUrl: tab.url, titre: info.selectionText });
@@ -194,6 +212,7 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
       await Storage.setCurrentDraft(updated);
       notify('Reco Croix-Rousse', 'Source mise à jour.');
     } else if (info.menuItemId === MENU_SET_IMAGE) {
+      await ensureImageHostAccess();
       const blob = await fetchImageBlob(info.srcUrl);
       const { url } = await Api.uploadImage(blob);
       const updated = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftImage(draftId, url));
@@ -205,6 +224,7 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
       await handleDateSelection(tab, 'date-fin', info.selectionText);
     }
   } catch (error) {
+    console.error('[rcx] menu action failed:', error);
     if (error instanceof ImageFetchError) {
       notify('Reco Croix-Rousse — erreur', error.message);
     } else if (error instanceof ApiError && error.status === 401) {

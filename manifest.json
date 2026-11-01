@@ -14,6 +14,7 @@
     }
   },
   "permissions": ["storage", "contextMenus", "activeTab", "notifications", "scripting", "windows"],
+  "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "src/background.js",
     "scripts": ["vendor/browser-polyfill.js", "src/storage.js", "src/api.js", "src/dateParser.js", "src/background.js"]
