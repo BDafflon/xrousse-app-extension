@@ -2,7 +2,7 @@
 // Firefox (MV3 background event page, no importScripts) loads them instead
 // via manifest.json's background.scripts array, before this file.
 if (typeof importScripts === 'function') {
-  importScripts('../vendor/browser-polyfill.js', 'storage.js', 'api.js', 'dateParser.js');
+  importScripts('../vendor/browser-polyfill.js', 'storage.js', 'api.js', 'dateParser.js', 'priceParser.js');
 }
 
 const MENU_CREATE_DRAFT = 'rcx-create-draft';
@@ -12,6 +12,7 @@ const MENU_SET_SOURCE = 'rcx-set-source';
 const MENU_SET_IMAGE = 'rcx-set-image';
 const MENU_SET_DATE = 'rcx-set-date';
 const MENU_SET_DATE_FIN = 'rcx-set-date-fin';
+const MENU_SET_PRIX = 'rcx-set-prix';
 
 async function registerContextMenus() {
   // Service workers (Chrome) and event pages (Firefox) can both restart and
@@ -51,6 +52,11 @@ async function registerContextMenus() {
   browser.contextMenus.create({
     id: MENU_SET_DATE_FIN,
     title: 'Utiliser la sélection comme date de fin',
+    contexts: ['selection'],
+  });
+  browser.contextMenus.create({
+    id: MENU_SET_PRIX,
+    title: 'Utiliser la sélection comme prix',
     contexts: ['selection'],
   });
 }
@@ -222,6 +228,15 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
       await handleDateSelection(tab, 'date', info.selectionText);
     } else if (info.menuItemId === MENU_SET_DATE_FIN) {
       await handleDateSelection(tab, 'date-fin', info.selectionText);
+    } else if (info.menuItemId === MENU_SET_PRIX) {
+      const prix = parsePriceString(info.selectionText || '');
+      if (prix === null) {
+        notify('Reco Croix-Rousse — erreur', `Prix non reconnu : « ${info.selectionText} ». Exemples : 12 €, 5 à 10 €, gratuit.`);
+        return;
+      }
+      const updated = await withStaleDraftRecovery(tab, (draftId) => Api.patchDraftPrix(draftId, prix));
+      await Storage.setCurrentDraft(updated);
+      notify('Reco Croix-Rousse', 'Prix mis à jour.');
     }
   } catch (error) {
     console.error('[rcx] menu action failed:', error);

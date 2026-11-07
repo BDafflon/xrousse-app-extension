@@ -143,6 +143,13 @@ async function patchDraftDateFin(draftId, dateFin) {
   });
 }
 
+async function patchDraftPrix(draftId, { prix_min, prix_max }) {
+  return authedJson(`/drafts/${draftId}/prix`, {
+    method: 'PATCH',
+    body: JSON.stringify({ prix_min, prix_max }),
+  });
+}
+
 async function uploadImage(blob) {
   const formData = new FormData();
   formData.append('file', blob);
@@ -166,5 +173,6 @@ const Api = {
   patchDraftImage,
   patchDraftDate,
   patchDraftDateFin,
+  patchDraftPrix,
   uploadImage,
 };
